@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>浏览器里跑 Python · .py 运行器</title>
+<style>
+:root{
+  --bg:#0d1117; --bg-sub:#161b22; --card:#161b22; --border:#30363d;
+  --fg:#e6edf3; --fg-muted:#8b949e; --accent:#58a6ff; --green:#2ea043; --red:#f85149;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.6}
+.hd{display:flex;align-items:center;gap:9px;padding:10px 13px;background:var(--bg-sub);
+  border-bottom:1px solid var(--border);flex-wrap:wrap;position:sticky;top:0;z-index:30}
+.hd b{font-size:15px}
+.st{font-size:11.5px;color:var(--fg-muted);font-family:ui-monospace,monospace}
+.hd .btn{margin-left:0}
+.btn{padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:var(--bg-sub);
+  color:var(--fg);font-size:12.5px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn:active{transform:scale(.96)}
+.btn-p{background:var(--green);color:#fff;border-color:var(--green);font-weight:600}
+.btn-p:hover{background:#3fb950;border-color:#3fb950;color:#fff}
+.wrap{display:flex;flex-direction:column;height:calc(100vh - 52px)}
+@media(min-width:820px){ .wrap{flex-direction:row} }
+.pane{flex:1 1 50%;min-width:0;display:flex;flex-direction:column;min-height:0}
+.pane+.pane{border-top:1px solid var(--border)}
+@media(min-width:820px){ .pane+.pane{border-top:none;border-left:1px solid var(--border)} }
+.ph{font-size:11.5px;color:var(--fg-muted);padding:6px 13px;background:var(--bg-sub);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.ph .r{margin-left:auto}
+textarea{flex:1 1 auto;width:100%;resize:none;border:none;padding:11px 13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.7;
+  background:var(--bg);color:var(--fg);tab-size:4}
+textarea:focus{outline:none}
+#out{flex:1 1 auto;overflow:auto;padding:11px 13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.7;
+  white-space:pre-wrap;word-break:break-all}
+#out .l{display:block}
+#out .o{color:var(--fg)} #out .e{color:var(--red)} #out .c{color:var(--accent);font-weight:600}
+#out .d{color:var(--fg-muted)} #out .g{color:#3fb950}
+.bar{display:flex;gap:7px;align-items:center;padding:8px 13px;background:var(--bg-sub);
+  border-top:1px solid var(--border);flex:0 0 auto;flex-wrap:wrap}
+.bar input{flex:1 1 130px;min-width:96px;padding:5px 9px;border-radius:6px;font-size:12px;
+  border:1px solid var(--border);background:var(--bg);color:var(--fg);font-family:ui-monospace,monospace}
+.drop{border:1.5px dashed var(--border);border-radius:9px;padding:0;text-align:center;
+  color:var(--fg-muted);font-size:12px;margin:0}
+.drop.on{border-color:var(--accent);background:rgba(88,166,255,.08);color:var(--accent)}
+.note{padding:11px 13px;font-size:12px;color:var(--fg-muted);background:var(--bg-sub);
+  border-top:1px solid var(--border);flex:0 0 auto}
+@media(max-width:819px){ .wrap{height:auto} .pane{min-height:260px} }
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <b>🐍 浏览器里跑 Python</b>
+  <span class="st" id="st">未加载</span>
+  <button class="btn" id="bEx">示例</button>
+  <button class="btn" id="bClr">清屏</button>
+  <button class="btn" id="bHelp">原理</button>
+</div>
+
+<div class="wrap">
+  <div class="pane">
+    <div class="ph">
+      <span>代码（.py）</span>
+      <span class="r">
+        <button class="btn" id="bFile">📂 打开 .py</button>
+        <input type="file" id="fIn" accept=".py,.txt,text/x-python" style="display:none">
+      </span>
+    </div>
+    <div class="drop" id="drop" style="padding:7px;margin:9px 13px 0">把 .py 文件拖到这里</div>
+    <textarea id="code" spellcheck="false" placeholder="# 在这里写 Python，或打开 / 拖入一个 .py 文件&#10;print('hello from browser')"></textarea>
+    <div class="bar">
+      <button class="btn btn-p" id="bRun">▶ 运行 (Ctrl+Enter)</button>
+      <button class="btn" id="bStop">■ 停止</button>
+      <input id="pkg" placeholder="包名 如 numpy">
+      <button class="btn" id="bInst">📦 装包</button>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div class="ph"><span>输出</span><span class="r" id="tm"></span></div>
+    <div id="out"></div>
+    <div class="note">
+      代码只在你自己的浏览器里执行，不上传、不经任何服务器。首次运行要下载约 10MB 的 Python 运行环境（WebAssembly），之后秒开。
+    </div>
+  </div>
+</div>
+
+<div id="helpMask" style="position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:99;display:none;
+  align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;
+    max-width:640px;width:100%;max-height:82vh;overflow:auto;padding:18px">
+    <div style="display:flex;align-items:center;margin-bottom:12px">
+      <b style="font-size:16px">原理：为什么浏览器能跑 Python</b>
+      <button class="btn" id="bHelpX" style="margin-left:auto">✕</button>
+    </div>
+    <div id="helpBody" style="font-size:13px;line-height:1.8"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   浏览器里跑 .py —— 基于 Pyodide（CPython 编译成 WebAssembly）
+   全名：Python；文件后缀：.py
+   ============================================================ */
+var PY={loaded:false,loading:false,py:null,ver:''};
+var CDN=[
+  'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js',
+  'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js',
+  'https://unpkg.com/pyodide@0.26.2/full/pyodide.js',
+  'https://pyodide-cdn2.iodide.io/v0.26.2/full/pyodide.js'
+];
+var IDX=(function(){ try{ var v=localStorage.getItem('py_cdn'); if(v!==null) return parseInt(v,10)||0; }catch(e){} return 0; })();
+
+function $(i){ return document.getElementById(i); }
+function log(t,c){
+  var o=$('out'), d=document.createElement('span');
+  d.className='l '+(c||'o'); d.textContent=t;
+  o.appendChild(d); o.scrollTop=o.scrollHeight;
+}
+function st(t){ $('st').textContent=t; }
+
+function load(){
+  if(PY.loaded) return Promise.resolve(PY.py);
+  if(PY.loading) return Promise.reject(new Error('正在加载中，请稍候…'));
+  PY.loading=true;
+  st('加载运行环境…');
+  log('首次运行要下载约 10MB 的 Python（WebAssembly），请稍候。之后同一页面再跑就是秒开。','d');
+
+  function one(i){
+    if(i>=CDN.length){
+      PY.loading=false; st('加载失败');
+      log('全部 4 个 CDN 都取不到。可能网络挡了这些地址。','e');
+      log('可尝试：换网络 / 关广告拦截 / 刷新重试。','d');
+      return Promise.reject(new Error('Python 环境加载失败'));
+    }
+    st('尝试源 '+(i+1)+'/'+CDN.length+'…');
+    return new Promise(function(res,rej){
+      var s=document.createElement('script');
+      s.src=CDN[i];
+      s.onload=function(){ res(); };
+      s.onerror=function(){ if(s.parentNode) s.parentNode.removeChild(s); rej(new Error('fail')); };
+      document.head.appendChild(s);
+    }).then(function(){
+      if(typeof loadPyodide!=='function') throw new Error('no api');
+      return loadPyodide({ indexURL: CDN[i].replace(/\/pyodide\.js$/,'/') });
+    }).then(function(py){
+      PY.py=py; PY.loaded=true; PY.loading=false; PY.ver=py.version||'';
+      try{ localStorage.setItem('py_cdn',String(i)); }catch(e){}
+      st('已就绪 · Python '+PY.ver);
+      log('✅ Python 环境就绪'+(PY.ver?('（'+PY.ver+'）'):''),'g');
+      py.setStdout({batched:function(t){ log(t,'o'); }});
+      py.setStderr({batched:function(t){ log(t,'e'); }});
+      return py;
+    }).catch(function(){ return one(i+1); });
+  }
+  return one(IDX);
+}
+
+function run(){
+  var code=($('code').value||'').trim();
+  if(!code){ log('代码是空的','e'); return; }
+  log('▶ 运行中…','c');
+  var t0=Date.now(); $('tm').textContent='';
+  load().then(function(py){
+    return py.runPythonAsync(code);
+  }).then(function(r){
+    var ms=Date.now()-t0;
+    if(r!==undefined&&r!==null&&String(r)!==''){ try{ log(String(r),'g'); }catch(e){} }
+    $('tm').textContent='用时 '+(ms/1000).toFixed(2)+'s';
+    log('— 完成 —','d');
+  }).catch(function(e){ log(String((e&&e.message)||e),'e'); });
+}
+
+function inst(){
+  var p=($('pkg').value||'').trim();
+  if(!p){ log('先填包名','e'); return; }
+  log('正在装 '+p+' …','c');
+  load().then(function(py){
+    return py.loadPackage(['micropip']).then(function(){ return py.pyimport('micropip'); })
+      .then(function(mp){ return mp.install(p.split(/[\s,]+/).filter(Boolean)); });
+  }).then(function(){ log('✅ 装好了：'+p,'g'); $('pkg').value=''; })
+    .catch(function(e){
+      log('安装失败：'+String((e&&e.message)||e),'e');
+      log('提示：纯 Python 包可以装；带 C 扩展的（如 numpy）要用 Pyodide 官方预编译版。','d');
+    });
+}
+
+/* ---- 文件：选择 / 拖拽 ---- */
+function readPy(f){
+  if(!f) return;
+  var fr=new FileReader();
+  fr.onload=function(){ $('code').value=String(fr.result||''); log('已载入 '+f.name+'（'+f.size+' 字节）','d'); };
+  fr.onerror=function(){ log('读不了这个文件','e'); };
+  fr.readAsText(f);
+}
+$('bFile').onclick=function(){ $('fIn').click(); };
+$('fIn').onchange=function(){ readPy(this.files && this.files[0]); this.value=''; };
+var dz=$('drop');
+['dragenter','dragover'].forEach(function(ev){
+  dz.addEventListener(ev,function(e){ e.preventDefault(); e.stopPropagation(); dz.classList.add('on'); });
+});
+['dragleave','drop'].forEach(function(ev){
+  dz.addEventListener(ev,function(e){ e.preventDefault(); e.stopPropagation(); dz.classList.remove('on'); });
+});
+dz.addEventListener('drop',function(e){
+  var f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) readPy(f);
+});
+window.addEventListener('dragover',function(e){ e.preventDefault(); });
+window.addEventListener('drop',function(e){ e.preventDefault(); });
+
+/* ---- 按钮 ---- */
+$('bRun').onclick=run;
+$('bInst').onclick=inst;
+$('bClr').onclick=function(){ $('out').innerHTML=''; };
+$('bStop').onclick=function(){
+  log('■ 已请求停止。Python 无法强制杀线程，会在下一个检查点退出。','d');
+};
+$('bEx').onclick=function(){
+  $('code').value=[
+    "import sys",
+    "print('Python', sys.version.split()[0], '— 跑在浏览器里（WebAssembly）')",
+    "",
+    "def fib(n):",
+    "    return n if n < 2 else fib(n-1) + fib(n-2)",
+    "",
+    "print('fib(20) =', fib(20))",
+    "",
+    "# 需要第三方包时：import micropip; await micropip.install('包名')",
+    "# 也可以直接 await 顶层 await，runPythonAsync 支持"
+  ].join('\n');
+};
+(function(){
+  var ta=$('code');
+  ta.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); }
+    else if(e.key==='Tab'){
+      e.preventDefault();
+      var s=this.selectionStart,en=this.selectionEnd;
+      this.value=this.value.slice(0,s)+'    '+this.value.slice(en);
+      this.selectionStart=this.selectionEnd=s+4;
+    }
+  });
+})();
+
+/* ---- 原理说明 ---- */
+$('helpBody').innerHTML=[
+  '<p><b>1. 后缀是什么</b><br>.py 是 <b>Python</b> 源代码文件的后缀。Python 是一门解释型语言，全名就叫 Python，文件写作 <code>xxx.py</code>。</p>',
+  '<p><b>2. 浏览器为什么能跑</b><br>浏览器原生只认识 JavaScript。要跑 Python，办法是把 Python 解释器本身搬进浏览器 —— 这就是 <b>Pyodide</b> 做的事：它把官方 CPython 用 Emscripten 编译成 <b>WebAssembly</b>（一种浏览器能直接执行的字节码），打包成约 10MB 的文件。下载完，你的浏览器里就有一个真的 Python 解释器了。</p>',
+  '<p><b>3. 这段 HTML 做了什么</b><br>' +
+  '• 引入 pyodide.js → 调 <code>loadPyodide()</code> 初始化解释器<br>' +
+  '• <code>py.setStdout()</code> 接管 print，把输出写进右侧面板<br>' +
+  '• <code>py.runPythonAsync(code)</code> 执行你的代码，返回最后一个表达式的值<br>' +
+  '• <code>micropip.install()</code> 装第三方包<br>' +
+  '• 文件选择 / 拖拽读取 .py 内容，填进编辑区</p>',
+  '<p><b>4. 关键点：不经过服务器</b><br>整个执行过程都在你自己的浏览器标签页里。代码不会上传到任何地方，断网也能跑（环境已缓存的话）。这也是它比在线 Python 运行器更安全的地方。</p>',
+  '<p><b>5. 能用 / 不能用</b><br>' +
+  '✅ 用：标准库（math / json / re / datetime …）、纯 Python 的第三方包、画图（matplotlib 输出到 canvas）、pandas 数据处理<br>' +
+  '❌ 不能：访问本地文件系统、开 socket 连任意主机（浏览器沙箱限制）、装带 C 扩展且没有预编译版的包、跑特别重的计算会卡住页面</p>',
+  '<p><b>6. 为什么要多个 CDN</b><br>Pyodide 那 10MB 文件托管在公共 CDN 上，某些网络可能访问不了。所以代码里放了 4 个备选地址，一个失败自动换下一个，并把成功的那个记在 localStorage，下次直接用。</p>'
+].join('');
+$('bHelp').onclick=function(){ $('helpMask').style.display='flex'; };
+$('bHelpX').onclick=function(){ $('helpMask').style.display='none'; };
+$('helpMask').onclick=function(e){ if(e.target===this) this.style.display='none'; };
+
+log('提示：点「示例」看个能跑的例子，或直接 Ctrl+Enter 运行。','d');
+</script>
+</body>
+</html>
